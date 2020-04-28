@@ -7,16 +7,17 @@
 class QTimer;
 class QMqttClient;
 
-class SensorInformation : public QObject
+class Ic_MQTT_client : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(double diameter READ diameter WRITE setDiameter NOTIFY diameterChanged)
     Q_PROPERTY(double distance READ distance WRITE setDistance NOTIFY distanceChanged)
 
 public:
-    explicit SensorInformation(QObject *parent = nullptr);
-
+    explicit Ic_MQTT_client(QObject *parent = nullptr);
     void start();
+    //bool connect();
+    QString publish_topic(QString topicDiameter, QString topicDistance);
     double diameter() const;
     double distance() const;
 
@@ -31,14 +32,15 @@ public slots:
     void setDistance(double distance);
 
 private:
-    QMqttClient *m_client;
-    QString m_id;
-    QTimer *m_fiveSecondTimer;
-    QTimer *m_secondTimer;
-    QTimer *m_tenMsTimer;
+    QMqttClient *client_;
+    QString id_;
+    QTimer *fiveSecondTimer_;
+    QTimer *secondTimer_;
+    QTimer *tenMsTimer_;
 
-    double m_diameter{10.};
-    double m_distance{50.};
+    double diameter_{10.};
+    double distance_{50.};
+
 };
 
 #endif // SENSORINFORMATION_H

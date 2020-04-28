@@ -18,90 +18,78 @@ inline double moveValue(double currentValue, double min, double max, double maxS
     return result;
 }
 
-SensorInformation::SensorInformation(QObject *parent) : QObject(parent)
+
+Ic_MQTT_client::Ic_MQTT_client(QObject *parent) : QObject(parent)
 {
-    m_id = QUuid::createUuid().toString();
+        fiveSecondTimer_ = new QTimer(this);
+        fiveSecondTimer_->setInterval(5000);
+        fiveSecondTimer_->setSingleShot(false);
+        connect(fiveSecondTimer_, &QTimer::timeout, [this]()
+        {
+            // Every five seconds report device still online
+            if (client_->state() == QMqttClient::Connected)
+            {
+                const QString content = QLatin1String(">Online");
+                client_->publish(QLatin1String("inlevelSensors/active"), content.toUtf8());
+            }
+        });
 
-    m_fiveSecondTimer = new QTimer(this);
-    m_fiveSecondTimer->setInterval(5000);
-    m_fiveSecondTimer->setSingleShot(false);
-    connect(m_fiveSecondTimer, &QTimer::timeout, [this]() {
-        // Every five seconds report device still online
-        if (m_client->state() == QMqttClient::Connected) {
-            const QString content = m_id + QLatin1String(">Online");
-            m_client->publish(QLatin1String("qtdemosensors/active"), content.toUtf8());
-        }
-    });
+        secondTimer_ = new QTimer(this);
+        secondTimer_->setInterval(1000);
+        secondTimer_->setSingleShot(false);
+        connect(secondTimer_, &QTimer::timeout, [this]() {
+            setDistance(moveValue(distance(), 0., 100., 1));
+            setDiameter(moveValue(diameter(), 0., 150., 1));
+        });
 
-    m_secondTimer = new QTimer(this);
-    m_secondTimer->setInterval(1000);
-    m_secondTimer->setSingleShot(false);
-    connect(m_secondTimer, &QTimer::timeout, [this]() {
-        setDistance(moveValue(distance(), 0., 100., 1));
-        setDiameter(moveValue(diameter(), 0., 150., 1));
-    });
-
-    m_tenMsTimer = new QTimer(this);
-    connect(m_tenMsTimer, &QTimer::timeout, [this]() {
-    });
-    m_tenMsTimer->setInterval(20);
-    m_tenMsTimer->setSingleShot(false);
-
-    m_client = new QMqttClient(this);
-    m_client->setWillTopic(QLatin1String("qtdemosensors/active"));
-    const QString will = m_id + QLatin1String(">Offline");
-    m_client->setWillMessage(will.toUtf8());
-    m_client->setHostname("localhost");
-    m_client->setPort(1883);
-    connect(m_client, &QMqttClient::stateChanged, [](QMqttClient::ClientState s) {
-        qDebug() << "Client state changed:" << s;
-    });
+        client_ = new QMqttClient(this);
+        client_->setWillTopic(QLatin1String("inlevelSensors/active"));
+        const QString will = QLatin1String(">Offline");
+        client_->setWillMessage(will.toUtf8());
+        client_->setHostname("localhost");
+        client_->setPort(1883);
+        connect(client_, &QMqttClient::stateChanged, [](QMqttClient::ClientState s)
+        {
+            qDebug() << "Client state changed:" << s;
+        });
 
 }
 
-void SensorInformation::start()
+void Ic_MQTT_client::start()
 {
-    m_client->connectToHost();
-    m_fiveSecondTimer->start();
-    m_secondTimer->start();
-    m_tenMsTimer->start();
+    client_->connectToHost();
+    fiveSecondTimer_->start();
+    secondTimer_->start();
 }
 
 
-double SensorInformation::distance() const
+double Ic_MQTT_client::distance() const
 {
-    return m_distance;
+    return distance_;
 }
 
-double SensorInformation::diameter() const
+double Ic_MQTT_client::diameter() const
 {
-    return m_diameter;
+    return diameter_;
 }
 
-void SensorInformation::setDistance(double distance)
-{
-    if (qFuzzyCompare(m_distance, distance))
-        return;
 
-    m_client->publish(QString::fromLatin1("qtdemosensors/%1/distance").arg(m_id),
+void Ic_MQTT_client::setDistance(double distance)
+{
+    client_->publish(QString::fromLatin1("inlevelSensors/%1/distance"),
                       QByteArray::number(distance));
-    m_distance = distance;
-    emit distanceChanged(m_distance);
+    distance_ = distance;
 
     //just for testing
-    qDebug() << "Test data distance: " << SensorInformation::m_distance;
+    qDebug() << "Test data distance: " << Ic_MQTT_client::distance_;
 }
 
-void SensorInformation::setDiameter(double diameter)
+void Ic_MQTT_client::setDiameter(double diameter)
 {
-    if (qFuzzyCompare(m_diameter, diameter))
-        return;
-
-    m_client->publish(QString::fromLatin1("qtdemosensors/%1/diameter").arg(m_id),
+    client_->publish(QString::fromLatin1("inlevelSensors/%1/distance"),
                       QByteArray::number(diameter));
-    m_diameter = diameter;
-    emit diameterChanged(m_diameter);
+    diameter_ = diameter;
 
     //just for testing
-    qDebug() << "Test data diameter: " << SensorInformation::m_diameter;
+    qDebug() << "Test data diameter: " << Ic_MQTT_client::diameter_;
 }
